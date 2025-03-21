@@ -1,0 +1,66 @@
+---
+## playbook for doing GCP stuff
+
+## 1 - create some GCP resources...
+
+- name: create some GCP resources
+  hosts: localhost
+  gather_facts: false
+  become: false
+
+  vars:
+  - sshKeyFile: tmp/sshKeyFile
+  - project: jims-oa-testing-stuff
+  - region: europe-west2
+  - zone: a
+  - instanceType: e2-micro
+
+  pre_tasks:
+  - name: generate an RSA keypair
+    openssh_keypair:
+      path: "{{ sshKeyFile }}"
+      ## should be true probs:
+      force: false
+  - name: get access token
+    command: "gcloud auth print-access-token --project {{ project }}"
+    register: access_token
+  - name: enable APIs
+    command: "gcloud services enable --project {{ project }} compute.googleapis.com"
+
+  tasks:
+
+  - name: remove a VM
+    gcp_compute_instance:
+      name: computey
+      project: "{{ project }}"
+      zone: "{{ region }}-{{ zone }}"
+      auth_kind: accesstoken
+      access_token: "{{ access_token.stdout }}"
+      state: absent
+
+  - name: Remove VPC Network
+    gcp_compute_network:
+      name: networky
+      project: "{{ project }}"
+      auth_kind: accesstoken
+      access_token: "{{ access_token.stdout }}"
+      state: absent
+
+  - name: Remove an inet address
+    gcp_compute_address:
+      name: addressy
+      region: "{{ region }}"
+      project: "{{ project }}"
+      auth_kind: accesstoken
+      access_token: "{{ access_token.stdout }}"
+      state: absent
+
+  - name: remove a GCP VM disk
+    gcp_compute_disk:
+      name: disky
+      project: "{{ project }}"
+      zone: "{{ region }}-{{ zone }}"
+      ## You need recent copy of ansible here - not Deb12 default version. Install from Ansble repo
+      auth_kind: accesstoken
+      access_token: "{{ access_token.stdout }}"
+      state: absent

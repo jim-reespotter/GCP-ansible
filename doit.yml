@@ -1,0 +1,151 @@
+---
+## playbook for doing GCP stuff
+
+## 1 - create some GCP resources...
+
+- name: create some GCP resources
+  hosts: localhost 
+  gather_facts: false 
+  become: false
+
+  vars:
+#  - sshKeyFile: tmp/sshKeyFile
+  - project: jims-oa-testing-stuff
+  - region: europe-west2
+  - zone: a
+  - instanceType: e2-micro
+
+  pre_tasks:
+
+  - name: get visible IP of local machine
+    ipify_facts:
+  - name: get access token
+    command: "gcloud auth print-access-token --project {{ project }}"
+    register: access_token
+  - name: enable APIs
+    command: "gcloud services enable --project {{ project }} compute.googleapis.com"
+
+  tasks:
+  - name: create a GCP VM disk
+    gcp_compute_disk:
+      name: disky
+      size_gb: 10
+      source_image: "projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20250313"
+#      source_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts"
+      project: "{{ project }}"
+      zone: "{{region }}-{{ zone }}"
+      ## You need recent copy of ansible here - not Deb12 default version. Install from Ansble repo
+      auth_kind: accesstoken
+      access_token: "{{ access_token.stdout }}"
+#      scopes:
+ #     - https://www.googleapis.com/auth/compute
+    register: disky
+
+  - name: Create VPC Network
+    gcp_compute_network:
+      name: networky
+      auto_create_subnetworks: yes
+      project: "{{ project }}"
+      auth_kind: accesstoken
+      access_token: "{{ access_token.stdout }}"
+    register: networky
+
+
+  - name: create an inet address
+    gcp_compute_address:
+      name: addressy
+      region: "{{ region }}"
+      project: "{{ project }}"
+      auth_kind: accesstoken
+      access_token: "{{ access_token.stdout }}"
+    register: addressy
+
+  - name: Create firewall rule to allow traffic from this host
+    gcp_compute_firewall:
+      name: firewally
+      project: "{{ project }}"
+      auth_kind: accesstoken
+      access_token: "{{ access_token.stdout }}"
+      network: "{{ networky }}"
+      allowed:
+      - ip_protocol: tcp
+        ports: ['22','80']
+#      source_ranges: "['{{ ipify_public_ip }}/32']"
+## think this needs to be: internal addresses (for IAP) plus my addr
+      source_ranges: ['0.0.0.0/0']
+      target_tags:
+      - ssh
+    register: firewally
+
+  - name: create a VM
+    gcp_compute_instance:
+      name: computey
+      machine_type: "{{ instanceType }}"
+      project: "{{ project }}"
+      zone: "{{ region }}-{{ zone }}"
+      auth_kind: accesstoken
+      access_token: "{{ access_token.stdout }}"
+      disks:
+      - auto_delete: true
+        boot: true
+        source: "{{ disky }}"
+      network_interfaces:
+      - network: "{{ networky }}"
+        access_configs:
+        - name: External NAT
+          nat_ip: "{{ addressy }}"
+          type: ONE_TO_ONE_NAT
+      metadata:
+        startup-script-url: gs:://graphite-playground/bootstrap.sh
+#        cost-center: '12345'
+      tags:
+        items:
+        - ssh
+    register: computey
+
+  - name: look at computer details
+    debug:
+      msg: "Computer details: {{ computey }}"
+      verbosity: 2
+
+  - name: Add ssh settings
+    command: "/usr/bin/gcloud compute ssh --quiet --project={{ project }} --zone={{ region }}-{{ zone }} --tunnel-through-iap --command='exit' computey"
+
+  - name: add SSH config
+    command: "gcloud compute config-ssh --quiet --project={{ project }}"
+
+  - name: add new instance to hosts
+    add_host:
+      group: gcp
+      name: "{{ computey.name }}.{{ region }}-{{ zone }}.{{ project }}"
+
+#  - name: list inventory_hostnmes
+ #   debug:
+  #    msg: "{{ inventory_hostnames }}"
+
+#  - name: list inventory hostvars
+#    debug:
+#      msg: "{{ hostvars }}"
+
+- name: install stuff on instances
+  hosts: gcp
+  gather_facts: true
+  become: true
+#  remote_user: jim_potter
+#  vars:
+#  - sshKeyFile: tmp/sshKeyFile
+#  - project: jims-oa-testing-stuff
+#  - region: europe-west2
+#  - zone: a
+#  - instanceType: e2-micro
+  tasks:
+  - name: install apache
+    apt:
+      pkg: apache2
+
+
+
+
+
+
+
