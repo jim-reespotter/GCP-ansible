@@ -9,18 +9,18 @@
   become: false
 
   vars:
-  - sshKeyFile: tmp/sshKeyFile
+#  - sshKeyFile: tmp/sshKeyFile
   - project: jims-oa-testing-stuff
   - region: europe-west2
   - zone: a
   - instanceType: e2-micro
 
   pre_tasks:
-  - name: generate an RSA keypair
-    openssh_keypair:
-      path: "{{ sshKeyFile }}"
-      ## should be true probs:
-      force: false
+#  - name: generate an RSA keypair
+ #   openssh_keypair:
+  #    path: "{{ sshKeyFile }}"
+   #   ## should be true probs:
+    #  force: false
   - name: get access token
     command: "gcloud auth print-access-token --project {{ project }}"
     register: access_token

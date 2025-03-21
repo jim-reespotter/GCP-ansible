@@ -6,6 +6,9 @@ To begin with you need to:
 - create a new project (add details to doit.yml vars)
 - don't know how to connect a billing account via API, so do this by hand...
 - you'll need to be logged in via gcloud (```gcloud auth login```)
+- you need the latest ansible (Deb 12 default one not up to date enough) - see [Ansible install notes](https://docs.ansible.com/ansible/latest/installation_guide/installation_distros.html#installing-ansible-on-debian)
+- you need gcloud - see [gcloud cli install on debian](https://cloud.google.com/sdk/docs/install#deb)
+- install ansible and python3-google-auth
 
 then: ```ansible-playbook -i ./hosts.yml doit.sh```
 
@@ -34,3 +37,4 @@ What this does:
 - requires internet accessible SSH access
   - how to use ```gcloud compute ssh --proxy-through-iap``` here instead?
   - constraining SSH to just ansible host doesn't work
+
